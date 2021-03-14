@@ -50,6 +50,13 @@ macro_rules! instantiate_client_pool {
                 Self { pool }
             }
 
+            pub fn with_interceptor(config: ClientConfig, interceptor: InterceptorFn) -> Self {
+                let size = config.pool_size;
+                let manager = ClientManager::with_interceptor(config, interceptor);
+                let pool = Pool::builder().max_open(size as u64).build(manager);
+                Self { pool }
+            }
+
             pub async fn get(&self) -> Result<$type, MobcTonicError> {
                 match self.pool.clone().get().await {
                     Ok(conn) => Ok(conn.into_inner()),
@@ -106,6 +113,7 @@ mod tests {
     use fixtures::{
         greeter_client::GreeterClient, start_server, start_server_verify_client_cert, HelloRequest,
     };
+    use tonic::Code;
 
     use super::*;
 
@@ -136,7 +144,6 @@ mod tests {
 
     #[tokio::test]
     async fn connect_pool_with_client_cert_should_work() -> Result<()> {
-        tracing_subscriber::fmt::init();
         let server_cert: CertConfig = toml::from_str(include_str!("fixtures/server.toml")).unwrap();
         tokio::spawn(
             async move { start_server_verify_client_cert("0.0.0.0:4001", server_cert).await },
@@ -157,6 +164,32 @@ mod tests {
             .into_inner();
 
         assert_eq!(reply.message, "Hello Tyr!");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connect_pool_with_client_cert_and_intercepter_should_work() -> Result<()> {
+        let server_cert: CertConfig = toml::from_str(include_str!("fixtures/server.toml")).unwrap();
+        tokio::spawn(
+            async move { start_server_verify_client_cert("0.0.0.0:4003", server_cert).await },
+        );
+        sleep(10).await;
+
+        let mut client_config: ClientConfig =
+            toml::from_str(include_str!("fixtures/client_with_cert.toml")).unwrap();
+
+        client_config.uri = "https://localhost:4003".to_owned();
+
+        let pool = ClientPool::with_interceptor(client_config, intercept);
+        let mut client = pool.get().await.unwrap();
+        let reply = client
+            .say_hello(HelloRequest {
+                name: "Tyr".to_owned(),
+            })
+            .await;
+
+        assert!(reply.is_err());
+        assert_eq!(reply.err().unwrap().code(), Code::FailedPrecondition);
         Ok(())
     }
 
@@ -185,5 +218,9 @@ mod tests {
 
     async fn sleep(duration: u64) {
         tokio::time::sleep(tokio::time::Duration::from_millis(duration)).await;
+    }
+
+    fn intercept(_req: Request<()>) -> Result<Request<()>, Status> {
+        Err(Status::failed_precondition("should faile"))
     }
 }
