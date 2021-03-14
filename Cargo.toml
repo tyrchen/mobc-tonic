@@ -10,7 +10,7 @@ homepage = "https://github.com/tyrchen/mobc-tonic"
 description = """
 A connection pool for tonic GRPC client.
 """
-readme = "../README.md"
+readme = "README.md"
 categories = ["development-tools"]
 keywords = ["grpc", "tonic"]
 
