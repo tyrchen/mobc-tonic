@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::net::SocketAddr;
 use tonic::{
     transport::{Identity, Server, ServerTlsConfig},
     Request, Response, Status,

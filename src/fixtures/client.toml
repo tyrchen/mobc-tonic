@@ -1,4 +1,4 @@
-uri = "localhost:4000"
+uri = "https://localhost:4000"
 domain = "localhost"
 pool_size = 8
 ca_cert = """-----BEGIN CERTIFICATE-----
