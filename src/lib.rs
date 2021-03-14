@@ -12,33 +12,32 @@ pub use config::{CertConfig, ClientConfig};
 pub use error::MobcTonicError;
 
 /// re-exports Manager and Pool
-pub use mobc::{Manager, Pool};
-
-#[allow(dead_code)]
-pub struct ClientManager {
-    config: ClientConfig,
-    interceptor: Option<InterceptorFn>,
-}
-
-impl ClientManager {
-    pub fn new(config: ClientConfig) -> Self {
-        Self {
-            config,
-            interceptor: None,
-        }
-    }
-
-    pub fn with_interceptor(config: ClientConfig, interceptor: InterceptorFn) -> Self {
-        Self {
-            config,
-            interceptor: Some(interceptor),
-        }
-    }
-}
+pub use mobc::{Error, Manager, Pool};
 
 #[macro_export]
 macro_rules! instantiate_client_pool {
     ($type:ty) => {
+        #[allow(dead_code)]
+        pub struct ClientManager {
+            pub(crate) config: ClientConfig,
+            pub(crate) interceptor: Option<InterceptorFn>,
+        }
+
+        impl ClientManager {
+            pub fn new(config: ClientConfig) -> Self {
+                Self {
+                    config,
+                    interceptor: None,
+                }
+            }
+
+            pub fn with_interceptor(config: ClientConfig, interceptor: InterceptorFn) -> Self {
+                Self {
+                    config,
+                    interceptor: Some(interceptor),
+                }
+            }
+        }
         pub struct ClientPool {
             pool: Pool<ClientManager>,
         }
@@ -60,9 +59,9 @@ macro_rules! instantiate_client_pool {
             pub async fn get(&self) -> Result<$type, MobcTonicError> {
                 match self.pool.clone().get().await {
                     Ok(conn) => Ok(conn.into_inner()),
-                    Err(mobc::Error::Timeout) => Err(MobcTonicError::Timeout),
-                    Err(mobc::Error::BadConn) => Err(MobcTonicError::BadConn),
-                    Err(mobc::Error::Inner(e)) => Err(e),
+                    Err(Error::Timeout) => Err(MobcTonicError::Timeout),
+                    Err(Error::BadConn) => Err(MobcTonicError::BadConn),
+                    Err(Error::Inner(e)) => Err(e),
                 }
             }
         }

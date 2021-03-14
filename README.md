@@ -7,6 +7,13 @@ Usage:
 First, instantiate the implementation for your client:
 
 ```rust
+use mobc_tonic::{
+    instantiate_client_pool, ClientConfig, Error, InterceptorFn, Manager, MobcTonicError, Pool,
+};
+use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
+
+use gen::greeter_client::GreeterClient;
+
 instantiate_client_pool!(GreeterClient<Channel>);
 ```
 
