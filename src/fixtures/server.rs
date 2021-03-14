@@ -1,6 +1,6 @@
 use anyhow::Result;
 use tonic::{
-    transport::{Identity, Server, ServerTlsConfig},
+    transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status,
 };
 
@@ -36,6 +36,27 @@ pub async fn start_server(addr: &str, cert_config: CertConfig) -> Result<()> {
 
     Server::builder()
         .tls_config(ServerTlsConfig::new().identity(identity))?
+        .add_service(GreeterServer::new(svc))
+        .serve(addr)
+        .await?;
+    Ok(())
+}
+
+pub async fn start_server_verify_client_cert(addr: &str, cert_config: CertConfig) -> Result<()> {
+    let addr = addr.parse().unwrap();
+    println!("GreeterServer listening on {}", &addr);
+
+    let ca_cert: CertConfig = toml::from_str(include_str!("ca.toml")).unwrap();
+    let client_ca_cert = Certificate::from_pem(ca_cert.cert);
+
+    let svc = MyGreeter::default();
+    let identity = Identity::from_pem(cert_config.cert, cert_config.sk);
+    let tls = ServerTlsConfig::new()
+        .identity(identity)
+        .client_ca_root(client_ca_cert);
+
+    Server::builder()
+        .tls_config(tls)?
         .add_service(GreeterServer::new(svc))
         .serve(addr)
         .await?;

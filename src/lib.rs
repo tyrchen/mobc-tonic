@@ -103,17 +103,19 @@ macro_rules! instantiate_client_pool {
 mod tests {
     use anyhow::Result;
 
-    use fixtures::start_server;
-    use fixtures::{greeter_client::GreeterClient, HelloRequest};
+    use fixtures::{
+        greeter_client::GreeterClient, start_server, start_server_verify_client_cert, HelloRequest,
+    };
 
     use super::*;
 
     instantiate_client_pool!(GreeterClient<Channel>);
 
     #[tokio::test]
-    async fn connect_pool_works() -> Result<()> {
+    async fn connect_pool_should_work() -> Result<()> {
         let server_cert: CertConfig = toml::from_str(include_str!("fixtures/server.toml")).unwrap();
         tokio::spawn(async move { start_server("0.0.0.0:4000", server_cert).await });
+        sleep(10).await;
 
         let client_config: ClientConfig =
             toml::from_str(include_str!("fixtures/client.toml")).unwrap();
@@ -130,5 +132,58 @@ mod tests {
 
         assert_eq!(reply.message, "Hello Tyr!");
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn connect_pool_with_client_cert_should_work() -> Result<()> {
+        tracing_subscriber::fmt::init();
+        let server_cert: CertConfig = toml::from_str(include_str!("fixtures/server.toml")).unwrap();
+        tokio::spawn(
+            async move { start_server_verify_client_cert("0.0.0.0:4001", server_cert).await },
+        );
+        sleep(10).await;
+
+        let client_config: ClientConfig =
+            toml::from_str(include_str!("fixtures/client_with_cert.toml")).unwrap();
+
+        let pool = ClientPool::new(client_config);
+        let mut client = pool.get().await.unwrap();
+        let reply = client
+            .say_hello(HelloRequest {
+                name: "Tyr".to_owned(),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(reply.message, "Hello Tyr!");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn connect_pool_with_invalid_client_cert_should_fail() -> Result<()> {
+        let server_cert: CertConfig = toml::from_str(include_str!("fixtures/server.toml")).unwrap();
+        tokio::spawn(
+            async move { start_server_verify_client_cert("0.0.0.0:4002", server_cert).await },
+        );
+        sleep(10).await;
+
+        let client_config: ClientConfig =
+            toml::from_str(include_str!("fixtures/client_with_invalid_cert.toml")).unwrap();
+
+        let pool = ClientPool::new(client_config);
+        let mut client = pool.get().await.unwrap();
+        let reply = client
+            .say_hello(HelloRequest {
+                name: "Tyr".to_owned(),
+            })
+            .await;
+
+        assert!(reply.is_err());
+        Ok(())
+    }
+
+    async fn sleep(duration: u64) {
+        tokio::time::sleep(tokio::time::Duration::from_millis(duration)).await;
     }
 }
