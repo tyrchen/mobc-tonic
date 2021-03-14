@@ -11,6 +11,9 @@ pub type InterceptorFn = fn(Request<()>) -> Result<Request<()>, Status>;
 pub use config::{CertConfig, ClientConfig};
 pub use error::MobcTonicError;
 
+/// re-exports Manager and Pool
+pub use mobc::{Manager, Pool};
+
 #[allow(dead_code)]
 pub struct ClientManager {
     config: ClientConfig,
@@ -36,9 +39,6 @@ impl ClientManager {
 #[macro_export]
 macro_rules! instantiate_client_pool {
     ($type:ty) => {
-        use mobc::{async_trait, Error, Manager, Pool};
-        use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
-
         pub struct ClientPool {
             pool: Pool<ClientManager>,
         }
@@ -60,14 +60,14 @@ macro_rules! instantiate_client_pool {
             pub async fn get(&self) -> Result<$type, MobcTonicError> {
                 match self.pool.clone().get().await {
                     Ok(conn) => Ok(conn.into_inner()),
-                    Err(Error::Timeout) => Err(MobcTonicError::Timeout),
-                    Err(Error::BadConn) => Err(MobcTonicError::BadConn),
-                    Err(Error::Inner(e)) => Err(e),
+                    Err(mobc::Error::Timeout) => Err(MobcTonicError::Timeout),
+                    Err(mobc::Error::BadConn) => Err(MobcTonicError::BadConn),
+                    Err(mobc::Error::Inner(e)) => Err(e),
                 }
             }
         }
 
-        #[async_trait]
+        #[tonic::async_trait]
         impl Manager for ClientManager {
             type Connection = $type;
             type Error = MobcTonicError;
@@ -109,6 +109,8 @@ macro_rules! instantiate_client_pool {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+
+    use tonic::transport::{Certificate, Channel, ClientTlsConfig, Identity};
 
     use fixtures::{
         greeter_client::GreeterClient, start_server, start_server_verify_client_cert, HelloRequest,
