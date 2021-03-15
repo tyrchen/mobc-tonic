@@ -38,9 +38,19 @@ macro_rules! instantiate_client_pool {
                 }
             }
         }
+
         pub struct ClientPool {
             pool: Pool<ClientManager>,
         }
+
+        impl Clone for ClientPool {
+            fn clone(&self) -> Self {
+                Self {
+                    pool: self.pool.clone(),
+                }
+            }
+        }
+
         impl ClientPool {
             pub fn new(config: ClientConfig) -> Self {
                 let size = config.pool_size;
